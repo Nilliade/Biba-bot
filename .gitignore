@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Окружение и секреты
+.env
+.env.*
+!.env.example
+
+# Локальные данные SQLite
+data/*.sqlite-wal
+data/*.sqlite-shm
+data/*.sqlite-journal
+data/track_cache.json
+*.log
+
+# Редакторы и ОС
+.idea/
+.vscode/
+.DS_Store
