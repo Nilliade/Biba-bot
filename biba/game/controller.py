@@ -166,6 +166,17 @@ class GameController:
         await self.voice.stop(self.game.guild_id)
         await self.voice.disconnect(self.game.guild_id)
         await self._clear_host_role()
+        await self._resume_music()
+
+    async def _resume_music(self) -> None:
+        """Возвращает музыку, поставленную на паузу ради игры."""
+        music = getattr(self.bot, "music", None)
+        if music is None:
+            return
+        try:
+            await music.resume_after_game(self.game.guild_id)
+        except Exception:  # noqa: BLE001
+            log.exception("Failed to resume music after game")
 
     async def _rerender(self) -> None:
         """Заново рисует экран текущей фазы, не меняя логику раунда."""
@@ -806,6 +817,7 @@ class GameController:
             self.engine.remove_game(game.guild_id)
             self.closed = True
             self._cancel_tasks()
+            await self._resume_music()
 
     async def finish_from_interaction(self, interaction: discord.Interaction) -> None:
         if interaction.user.id != self.game.host_id and not getattr(
@@ -847,6 +859,7 @@ class GameController:
                 except discord.HTTPException:
                     pass
             self._cancel_tasks()
+            await self._resume_music()
 
     async def cancel_from_interaction(self, interaction: discord.Interaction) -> None:
         allowed = interaction.user.id == self.game.host_id or getattr(
@@ -874,6 +887,7 @@ class GameController:
         self.engine.remove_game(self.game.guild_id)
         self.closed = True
         self._cancel_tasks()
+        await self._resume_music()
 
     async def _show_aborted(self) -> None:
         round_ = self.game.round

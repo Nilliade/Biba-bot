@@ -10,7 +10,9 @@ from discord.ext import commands
 
 from biba.bot import BibaBot
 from biba.game.embeds import error_embed, playlist_embed, playlists_embed, track_embed
+from biba.music.embeds import playlist_started_embed
 from biba.music.resolver import ResolveError
+from biba.music.service import MusicError
 
 log = logging.getLogger(__name__)
 
@@ -73,6 +75,57 @@ class PlaylistCog(commands.Cog):
             )
             return
         await interaction.followup.send(embed=track_embed(track, key=key))
+
+    @playlist.command(name="play", description="Поставить плейлист в очередь")
+    @app_commands.describe(name="Имя плейлиста (по умолчанию — melody)")
+    async def play(
+        self,
+        interaction: discord.Interaction,
+        name: str | None = None,
+    ) -> None:
+        guild = interaction.guild
+        if guild is None:
+            return
+        melody = self.bot.get_cog("MelodyCog")
+        is_active = getattr(melody, "is_active", None)
+        if is_active is not None and is_active(guild.id):
+            await self._error(
+                interaction, "Идёт игра «Угадай мелодию» — музыка вернётся после раунда."
+            )
+            return
+        key, display_name = playlist_key(name)
+        info = self.bot.playlists.get(guild.id, key)
+        if info is not None:
+            display_name = info["name"]
+        tracks = self.bot.playlists.tracks(guild.id, key)
+        if not tracks:
+            await self._error(
+                interaction,
+                f"Плейлист «{display_name}» пуст. Добавьте треки командой /playlist add.",
+            )
+            return
+        state = getattr(interaction.user, "voice", None)
+        channel = getattr(state, "channel", None) if state is not None else None
+        if channel is None:
+            settings = self.bot.music_settings.get(guild.id)
+            if settings.voice_channel_id:
+                channel = guild.get_channel(settings.voice_channel_id)
+        if channel is None:
+            await self._error(interaction, "Зайдите в голосовой канал.")
+            return
+        await interaction.response.defer()
+        try:
+            await self.bot.music.play_tracks(
+                guild,
+                channel,
+                tracks,
+                interaction.user.id,
+                text_channel_id=interaction.channel_id,
+            )
+        except MusicError as exc:
+            await self._error(interaction, str(exc))
+            return
+        await interaction.followup.send(embed=playlist_started_embed(display_name, len(tracks)))
 
     @playlist.command(name="list", description="Список плейлистов сервера")
     async def list_playlists(self, interaction: discord.Interaction) -> None:

@@ -40,10 +40,11 @@ def test_cogs_load(tmp_path: Path) -> None:
         for extension in EXTENSIONS:
             await bot.load_extension(extension)
         commands = {command.name for command in bot.tree.get_commands()}
-        assert {"melody", "playlist", "ping", "help", "about"} <= commands
+        assert {"melody", "music", "playlist", "ping", "help", "about"} <= commands
         melody = bot.tree.get_command("melody")
+        music = bot.tree.get_command("music")
         playlist = bot.tree.get_command("playlist")
-        assert melody is not None and playlist is not None
+        assert melody is not None and music is not None and playlist is not None
         assert {
             "start",
             "join",
@@ -59,10 +60,32 @@ def test_cogs_load(tmp_path: Path) -> None:
             "settings",
             "help",
         } <= {command.name for command in melody.commands}
-        assert {"add", "list", "show", "remove"} <= {command.name for command in playlist.commands}
+        assert {
+            "play",
+            "pause",
+            "resume",
+            "skip",
+            "stop",
+            "join",
+            "leave",
+            "queue",
+            "nowplaying",
+            "volume",
+            "shuffle",
+            "loop",
+            "247",
+            "djrole",
+            "settings",
+        } <= {command.name for command in music.commands}
+        assert {"add", "list", "show", "remove", "play"} <= {
+            command.name for command in playlist.commands
+        }
         assert bot.get_cog("MelodyCog") is not None
+        assert bot.get_cog("MusicCog") is not None
         assert bot.get_cog("PlaylistCog") is not None
         assert bot.get_cog("GeneralCog") is not None
+        assert bot.music is not None
+        assert bot.music_settings is not None
         await bot.close()
 
     asyncio.run(run())
