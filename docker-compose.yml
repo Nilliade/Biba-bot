@@ -1,0 +1,9 @@
+services:
+  biba:
+    build: .
+    container_name: biba-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
