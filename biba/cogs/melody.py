@@ -44,6 +44,10 @@ class MelodyCog(commands.Cog):
             return None
         return controller
 
+    def is_active(self, guild_id: int) -> bool:
+        """Идёт ли сейчас игра — музыку на это время лучше не запускать."""
+        return self._controller(guild_id) is not None
+
     async def shutdown(self) -> None:
         """Останавливает активные игры при выключении бота."""
         for controller in list(self.controllers.values()):
@@ -150,11 +154,14 @@ class MelodyCog(commands.Cog):
             settings=settings,
         )
         self.controllers[interaction.guild_id] = controller
+        # Игра занимает голосовой канал: музыку ставим на паузу.
+        await self.bot.music.pause_for_game(interaction.guild_id)
         await controller.send_lobby(interaction)
         if controller.message is None:
             self.bot.engine.cancel(interaction.guild_id, "Не удалось создать сообщение игры")
             self.bot.engine.remove_game(interaction.guild_id)
             self.controllers.pop(interaction.guild_id, None)
+            await self.bot.music.resume_after_game(interaction.guild_id)
             await self._error(interaction, "Не удалось создать сообщение игры.")
 
     @melody.command(name="join", description="Присоединиться к игре")

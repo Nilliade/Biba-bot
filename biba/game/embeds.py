@@ -484,6 +484,16 @@ def help_embed() -> discord.Embed:
         ),
         inline=False,
     )
+    embed.add_field(
+        name="🎧 Музыка",
+        value=(
+            "`/music play <запрос>` — включить трек\n"
+            "`/music skip`, `/music pause`, `/music queue`\n"
+            "`/music volume <0–200>`, `/music 247`\n"
+            "`/playlist play <имя>` — включить плейлист"
+        ),
+        inline=False,
+    )
     embed.set_footer(text="Минимум 2 игрока. Для игры нужен голосовой канал.")
     return embed
 

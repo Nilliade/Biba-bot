@@ -13,6 +13,7 @@ from biba.database import (
     Database,
     HistoryRepo,
     HostStateRepo,
+    MusicSettingsRepo,
     PlaylistRepo,
     SettingsRepo,
     WalletRepo,
@@ -22,11 +23,13 @@ from biba.game.engine import MelodyEngine
 from biba.music.player import VoiceManager
 from biba.music.playlists import PlaylistTrackProvider
 from biba.music.resolver import TrackResolver
+from biba.music.service import MusicService
 
 log = logging.getLogger(__name__)
 
 EXTENSIONS = (
     "biba.cogs.general",
+    "biba.cogs.music",
     "biba.cogs.melody",
     "biba.cogs.playlists",
 )
@@ -57,10 +60,12 @@ class BibaBot(commands.Bot):
         self.playlists = PlaylistRepo(self.db)
         self.history = HistoryRepo(self.db)
         self.hosts = HostStateRepo(self.db)
+        self.music_settings = MusicSettingsRepo(self.db)
         self.resolver = TrackResolver()
         self.track_provider = PlaylistTrackProvider(self.playlists)
         self.engine = MelodyEngine(self.wallet, self.track_provider)
         self.voice = VoiceManager(config.voice_enabled)
+        self.music = MusicService(self)
         self._stale_roles_cleared = False
         self._refund_interrupted_bets()
 
@@ -97,6 +102,7 @@ class BibaBot(commands.Bot):
         if not self._stale_roles_cleared:
             self._stale_roles_cleared = True
             await self._clear_stale_host_roles()
+        await self.music.restore_all()
         await self.change_presence(
             activity=discord.Activity(
                 type=discord.ActivityType.listening,
@@ -157,6 +163,10 @@ class BibaBot(commands.Bot):
         log.warning("Prefix command error: %s", error)
 
     async def close(self) -> None:
+        try:
+            await self.music.prepare_shutdown()
+        except Exception:  # noqa: BLE001
+            log.exception("Failed to prepare music service for shutdown")
         melody = self.get_cog("MelodyCog")
         shutdown = getattr(melody, "shutdown", None)
         if shutdown is not None:
@@ -164,6 +174,10 @@ class BibaBot(commands.Bot):
                 await shutdown()
             except Exception:  # noqa: BLE001
                 log.exception("Failed to stop active games on shutdown")
+        try:
+            await self.music.close()
+        except Exception:  # noqa: BLE001
+            log.exception("Failed to stop music service")
         try:
             await super().close()
         finally:

@@ -75,6 +75,13 @@ class VoiceManager:
             log.error("Playback failed in guild %s: %s", guild.id, exc)
             return False
 
+    def set_volume(self, guild: discord.Guild, volume: int) -> None:
+        """Меняет громкость текущего воспроизведения без перезапуска."""
+        vc = getattr(guild, "voice_client", None)
+        source = getattr(vc, "source", None)
+        if isinstance(source, discord.PCMVolumeTransformer):
+            source.volume = max(0.0, min(2.0, volume / 100))
+
     def stop(self, guild_id: int) -> None:
         vc = self._active.get(guild_id)
         if vc is None:

@@ -266,3 +266,38 @@ def test_host_role_is_persisted_and_cleared(tmp_path) -> None:
 
     asyncio.run(scenario())
     db.close()
+
+
+def test_finish_resumes_music() -> None:
+    from unittest.mock import AsyncMock
+
+    engine = make_engine()
+    game = begin_betting(engine)
+    music = SimpleNamespace(resume_after_game=AsyncMock())
+    controller = make_controller(engine, game, bot=SimpleNamespace(music=music))
+
+    async def scenario() -> None:
+        await controller.finish()
+
+    asyncio.run(scenario())
+    music.resume_after_game.assert_awaited_once_with(1)
+
+
+def test_message_loss_resumes_music() -> None:
+    from unittest.mock import AsyncMock
+
+    engine = make_engine()
+    game = begin_betting(engine)
+    music = SimpleNamespace(resume_after_game=AsyncMock())
+    message = FakeMessage(
+        error=discord.NotFound(SimpleNamespace(status=404, reason="Not Found"), "Удалено")
+    )
+    controller = make_controller(engine, game, message, bot=SimpleNamespace(music=music))
+
+    async def scenario() -> None:
+        await controller._edit(discord.Embed(title="Тест"))
+        assert controller._cleanup_task is not None
+        await controller._cleanup_task
+
+    asyncio.run(scenario())
+    music.resume_after_game.assert_awaited_once_with(1)

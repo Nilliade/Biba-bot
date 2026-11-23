@@ -740,6 +740,102 @@ class PlaylistRepo:
 # ---------------------------------------------------------------------------
 
 
+@dataclass
+class MusicSettings:
+    """Настройки музыкального бота из таблицы ``guild_settings``."""
+
+    guild_id: str
+    twenty_four_seven: bool = False
+    volume: int = 70
+    dj_role_id: int | None = None
+    voice_channel_id: int | None = None
+    text_channel_id: int | None = None
+
+
+class MusicSettingsRepo:
+    """CRUD для музыкальных настроек сервера."""
+
+    _COLUMNS = (
+        "twenty_four_seven",
+        "volume",
+        "dj_role_id",
+        "voice_channel_id",
+        "text_channel_id",
+    )
+
+    def __init__(self, db: Database) -> None:
+        self.db = db
+
+    def get(self, guild_id: int | str) -> MusicSettings:
+        with self.db.reading() as conn:
+            row = conn.execute(
+                "SELECT * FROM guild_settings WHERE guild_id = ?",
+                (str(guild_id),),
+            ).fetchone()
+        if row is None:
+            return MusicSettings(guild_id=str(guild_id))
+        return MusicSettings(
+            guild_id=str(row["guild_id"]),
+            twenty_four_seven=bool(row["twenty_four_seven"]),
+            volume=int(row["volume"] or 70),
+            dj_role_id=int(row["dj_role_id"]) if row["dj_role_id"] else None,
+            voice_channel_id=(int(row["voice_channel_id"]) if row["voice_channel_id"] else None),
+            text_channel_id=int(row["text_channel_id"]) if row["text_channel_id"] else None,
+        )
+
+    def update(self, guild_id: int | str, **changes: Any) -> MusicSettings:
+        current = self.get(guild_id)
+        values: dict[str, Any] = {
+            "twenty_four_seven": int(current.twenty_four_seven),
+            "volume": int(current.volume),
+            "dj_role_id": current.dj_role_id,
+            "voice_channel_id": current.voice_channel_id,
+            "text_channel_id": current.text_channel_id,
+        }
+        for key, value in changes.items():
+            if key not in values:
+                raise KeyError(f"Unknown music setting: {key}")
+            if key == "twenty_four_seven":
+                value = int(bool(value))
+            elif key == "volume":
+                value = max(0, min(200, int(value)))
+            elif value is not None:
+                value = int(value)
+            values[key] = value
+        with self.db.transaction() as conn:
+            conn.execute(
+                """
+                INSERT INTO guild_settings (
+                  guild_id, twenty_four_seven, volume, dj_role_id,
+                  voice_channel_id, text_channel_id
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(guild_id) DO UPDATE SET
+                  twenty_four_seven = excluded.twenty_four_seven,
+                  volume = excluded.volume,
+                  dj_role_id = excluded.dj_role_id,
+                  voice_channel_id = excluded.voice_channel_id,
+                  text_channel_id = excluded.text_channel_id
+                """,
+                (
+                    str(guild_id),
+                    int(values["twenty_four_seven"]),
+                    int(values["volume"]),
+                    str(values["dj_role_id"]) if values["dj_role_id"] is not None else None,
+                    (
+                        str(values["voice_channel_id"])
+                        if values["voice_channel_id"] is not None
+                        else None
+                    ),
+                    (
+                        str(values["text_channel_id"])
+                        if values["text_channel_id"] is not None
+                        else None
+                    ),
+                ),
+            )
+        return self.get(guild_id)
+
+
 class HostStateRepo:
     """Кто сейчас носит роль ведущего — чтобы снять её после перезапуска бота."""
 
